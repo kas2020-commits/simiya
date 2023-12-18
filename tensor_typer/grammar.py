@@ -6,39 +6,28 @@ import typing as t
 import lark
 
 DEFAULT_GRAMMAR: t.Final = r"""
-start: | ( prop | alias )+
+start: | ((field_def|prop) ";")+
 
-prop: "prop" prop_symbol type_constraint* "::" ((arg+ "->" general_type) | general_type) ";"
-alias: "type" alias_symbol ":=" concrete_type ("|" concrete_type)* ";"
+field_def: "field" _type_symbol ":=" fieldclass -> user_field
+prop: "prop" _prop_symbol local_constraints "::" prop_args general_type -> prop
 
-alias_symbol: UCASE_LETTER (LETTER|DIGIT)*
-prop_symbol: LCASE_LETTER (LETTER|DIGIT)+
+local_constraints: local_constraint* -> constraints
+local_constraint: "{" _var ":" fieldclass "}" -> constraint
 
-type_constraint: "{" var ":" concrete_type ("," concrete_type)* "}"
-arg: "(" var ":" general_type ")"
+prop_args: [arg+ "->"] -> args
+arg: "(" _var ":" general_type ")" -> arg
 
-general_type: concrete_type | (rank* var)
-concrete_type: rank* (atomic_type|alias_symbol)
-rank: "[" (INT | var) "]"
-atomic_type: i8 | i16 | i32 | i64 | f8 | f16 | f32 | f64
+general_type: _rank* (_concrete_field|_var) -> ret
+fieldclass: _concrete_field ("|" _concrete_field)* -> fields
 
-i8: "i8"
-i16: "i16"
-i32: "i32"
-i64: "i64"
-f8: "f8"
-f16: "f16"
-f32: "f32"
-f64: "f64"
+_rank: "[" (INT | _var) "]"
+_concrete_field: _atomic_field|_type_symbol
+!_atomic_field: "i8" | "i16" | "i32" | "i64" | "f8" | "f16" | "f32" | "f64"
+_var: LCASE_LETTER
+_prop_symbol: /[abcdefghijklmnopqrstuvwxyz]+[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'_']+/
+_type_symbol: /[ABCDEFGHIJKLMNOPQRSTUVWXYZ]+[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789]*/
 
-var: LCASE_LETTER
-
-%import common.WORD
-%import common.LETTER
-%import common.DIGIT
 %import common.LCASE_LETTER
-%import common.UCASE_LETTER
-%import common.CNAME
 %import common.WS
 %import common.INT
 

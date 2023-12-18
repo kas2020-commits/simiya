@@ -1,5 +1,4 @@
 import enum
-import typing as t
 from dataclasses import dataclass
 
 
@@ -32,7 +31,7 @@ class Var(enum.StrEnum):
     LETTER_Z = "z"
 
 
-class Field(enum.StrEnum):
+class AtomicField(enum.StrEnum):
     i8 = enum.auto()
     i16 = enum.auto()
     i32 = enum.auto()
@@ -47,38 +46,41 @@ class Field(enum.StrEnum):
     f64 = enum.auto()
 
 
-Symbol: t.TypeAlias = str
+type Symbol = str
+type FieldClassSymbol = str
+type Rank = int | Var
+type ConcreteField = AtomicField | FieldClassSymbol
+type FieldClass = frozenset[ConcreteField]
 
 
 @dataclass(slots=True, frozen=True)
 class GeneralType:
-    field: Var | Field
-    ranks: tuple[Var | int, ...]
+    field: Var | ConcreteField
+    ranks: tuple[Rank, ...]
 
 
 @dataclass(slots=True, frozen=True)
 class Arg:
     var: Var
-    typeclass: GeneralType
+    ret: GeneralType
 
 
 @dataclass(slots=True, frozen=True)
-class TypeConstraint:
-    var: Var
-    typeclasses: frozenset[GeneralType]
+class Constraint[T: Var | Symbol]:
+    binding: T
+    group: FieldClass
+
+
+type LocalConstraint = Constraint[Var]
+type ModuleConstraint = Constraint[Symbol]
 
 
 @dataclass(slots=True, frozen=True)
-class Alias:
-    symbol: Symbol
-    typeclasses: frozenset[Field]
-
-
-@dataclass(slots=True, frozen=True)
-class Decl:
+class Prop:
     symbol: Symbol
     ret: GeneralType
     args: tuple[Arg, ...]
+    constraints: tuple[LocalConstraint, ...]
 
 
-Namespace: t.TypeAlias = dict[Symbol, Decl | Alias]
+type Namespace = dict[Symbol, Prop | ModuleConstraint]

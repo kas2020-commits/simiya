@@ -15,21 +15,23 @@ def test():
     parser = grammar.gen_parser()
 
     prog = r"""
-type Float := f8 | f16 | f32 | f64;
-type Int := i8 | i16 | i32 | i64;
+field Float := f8 | f16 | f32 | f64;
+field Int := i8 | i16 | i32 | i64;
+field T := Float;
 
 prop matmul {a : Float} :: (x : [m][n]a) (y : [n][k]a) -> [m][k]a;
-prop iota :: (n : Int) -> [n]i32;
-prop id :: (x: a) -> a;
-prop baseValue :: Float;
+prop iota :: (n : Int) -> [n]Float;
+prop id :: (x : a) -> a;
+prop base_value :: Float;
+prop tensor_value :: [m][n][k][10]T;
     """
 
-    parse_tree = parser.parse(prog)
+    tree = parser.parse(prog)
 
     breakpoint()
 
     # ast = traverse_tree(parse_tree)
 
-    ast = parse_start(parse_tree)
+    ast = parse_start(tree)
 
     breakpoint()
