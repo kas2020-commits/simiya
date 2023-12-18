@@ -9,7 +9,7 @@ DEFAULT_GRAMMAR: t.Final = r"""
 start: | ( prop | alias )+
 
 prop: "prop" prop_symbol type_constraint* "::" ((arg+ "->" general_type) | general_type) ";"
-alias: "type" alias_symbol "=" concrete_type ("|" concrete_type)* ";"
+alias: "type" alias_symbol ":=" concrete_type ("|" concrete_type)* ";"
 
 alias_symbol: UCASE_LETTER (LETTER|DIGIT)*
 prop_symbol: LCASE_LETTER (LETTER|DIGIT)+

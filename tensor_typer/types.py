@@ -65,13 +65,13 @@ class Arg:
 @dataclass(slots=True, frozen=True)
 class TypeConstraint:
     var: Var
-    typeclasses: set[GeneralType]
+    typeclasses: frozenset[GeneralType]
 
 
 @dataclass(slots=True, frozen=True)
 class Alias:
     symbol: Symbol
-    typeclasses: set[Field]
+    typeclasses: frozenset[Field]
 
 
 @dataclass(slots=True, frozen=True)
