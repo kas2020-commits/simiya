@@ -15,10 +15,6 @@
       (system:
         let
           pkgs = import nixpkgs { inherit system; };
-          backend = repo.targets.backend {
-            inherit pkgs versions;
-            src = ./.;
-          };
           shells = repo.devShell { inherit pkgs versions; };
         in
         {
@@ -29,7 +25,10 @@
             default = shells.pylibs;
           };
           packages = {
-            default = backend;
+            default = repo.compiler {
+              inherit pkgs versions;
+              src = ./.;
+            };
           };
         }
       );
