@@ -13,11 +13,13 @@ readme = "README.md"
 dynamic = ["version", "description"]
 dependencies = [
   "lark >= 1.1.8",
-  "click >= 8.1"
+  "rich >= 13.7.0",
+  "typer[all] >= 0.9.0",
+  "networkx[default] >= 3.2.1"
 ]
 
 [project.scripts]
-tensor_typer = "tensor_typer.cli:main"
+ttyper = "tensor_typer.cli:App"
 
 [project.optional-dependencies]
 dev = [
