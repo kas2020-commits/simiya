@@ -1,8 +1,8 @@
-<h2 align="center">
+<p align="center">
   <picture>
     <img src="assets/simiya_logo.png" width="25%" />
   </picture>
-</h2>
+</p>
 
 # Simiya - An Array Programming Language With a Dependent Type System
 
