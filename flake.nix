@@ -1,5 +1,5 @@
 {
-  description = "Turnstone Monorepo - The one-stop-shop for all platform development";
+  description = "Simiya";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -17,10 +17,7 @@
           pkgs = import nixpkgs { inherit system; };
           backend = repo.targets.backend {
             inherit pkgs versions;
-            src = ./backend/python;
-          };
-          backend_container = tur: tag: repo.containers.backend {
-            inherit pkgs versions tur tag;
+            src = ./.;
           };
           shells = repo.devShell { inherit pkgs versions; };
         in
@@ -29,22 +26,10 @@
           devShells = {
             nopylibs = shells.nopylibs;
             pylibs = shells.pylibs;
-            default = shells.nopylibs;
+            default = shells.pylibs;
           };
           packages = {
-            backend = {
-              l0 = backend.l0;
-              l1 = backend.l1;
-              l2 = backend.l2;
-            };
-            container = {
-              backend = {
-                l0 = backend_container backend.l0 "l0";
-                l1 = backend_container backend.l1 "l1";
-                l2 = backend_container backend.l2 "l2";
-              };
-            };
-            default = backend.l2;
+            default = backend;
           };
         }
       );

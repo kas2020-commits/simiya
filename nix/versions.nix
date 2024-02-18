@@ -1,5 +1,5 @@
 {
-  python = "python312";
+  python = "python311";
   node = "nodejs_20";
   backend = "0.1.0";
   supportedSystems = [
