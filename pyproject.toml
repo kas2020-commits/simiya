@@ -1,14 +1,15 @@
 [project]
-name = "tensor_typer"
+name = "simiya"
 authors = [
   {name = "Karem Abdul-Samad", email = "kas2020@protonmail.com"},
 ]
 classifiers = [
   "Private :: Do Not Upload",
-  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
   "Typing :: Typed"
 ]
-requires-python = "~=3.11"
+requires-python = "~=3.12"
 readme = "README.md"
 dynamic = ["version", "description"]
 dependencies = [
@@ -19,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-ttyper = "tensor_typer.cli:App"
+simiya = "simiya.cli:App"
 
 [project.optional-dependencies]
 dev = [
@@ -33,6 +34,9 @@ dev = [
 [build-system]
 requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
+
+[project.urls]
+Source = "https://gitlab.com/kas-commits/simiya"
 
 [tool.ruff]
 exclude = [
@@ -61,13 +65,13 @@ exclude = [
     "deprecated"
 ]
 line-length = 79
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
 # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
 # McCabe complexity (`C901`) by default.
-select = ["E4", "E7", "E9", "F"]
+select = ["E4", "E7", "E9", "F", "I", "C901", "W"]
 ignore = []
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -98,3 +102,60 @@ line_length = 79
 
 [tool.pydocstyle]
 convention = "google"
+
+[tool.pyright]
+typeCheckingMode = "standard"
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv"
+]
+strictListInference = true
+strictDictionaryInference = true
+strictSetInference = true
+analyzeUnannotatedFunctions = true
+strictParameterNoneValue = true
+deprecateTypingAliases = true
+
+[tool.mypy]
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv"
+]
