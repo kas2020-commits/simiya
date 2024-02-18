@@ -1,7 +1,7 @@
 """Tensor Typer Program.
 """
 
-from . import grammar, cli
+from . import cli, grammar
 
 __all__ = ["grammar", "cli"]
 

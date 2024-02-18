@@ -2,10 +2,12 @@
 """
 
 import enum
-import lark
 import typing as t
 
-from . import types as tt, type_check as tc
+import lark
+
+from . import type_check as tc
+from . import types as tt
 
 
 class TreeData(enum.StrEnum):
@@ -38,7 +40,7 @@ class TokenType(enum.StrEnum):
     TYPE_SYMBOL = "TYPE_SYMBOL"
 
 
-type Child = lark.Token | lark.ParseTree
+Child: t.TypeAlias = lark.Token | lark.ParseTree
 
 
 def _parse_rank(child: Child) -> tt.Rank:

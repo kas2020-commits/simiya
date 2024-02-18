@@ -1,12 +1,9 @@
-import typing as t
-
-import typer
 import rich
-
-from tensor_typer.type_check import check_module
+import typer
 
 from . import grammar
 from .ast import parse_module
+from .type_check import check_module
 
 App = typer.Typer(help="Typer")
 
@@ -21,7 +18,7 @@ field Int := i8|i16|i32|i64;
 
 fn basic (x: [k][10]i32) -> k;
 fn len (x: [n]a) -> n;
-fn add (x: t, y: t) -> t; 
+fn add (x: t, y: t) -> t;
 fn <z Float> matmul (x: [a][b]z, y: [b][c]z) -> [a][c]z;
 
 fn <t Float> matmul2 (x: [m][n]t, y: [n][k]t, z: [k][j]t) -> [m][j]t {

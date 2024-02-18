@@ -1,8 +1,9 @@
-import networkx as nx
 import typing as t
 
-from . import types as tt
+import networkx as nx
 from rich import print
+
+from . import types as tt
 
 
 def get_new_varname(

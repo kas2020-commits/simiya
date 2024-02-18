@@ -1,6 +1,6 @@
 import enum
+import typing as t
 from dataclasses import dataclass
-from types import NoneType as NULL
 
 import networkx as nx
 
@@ -61,13 +61,12 @@ class ModScopeT(enum.Enum):
     SUM_TYPE = enum.auto()
 
 
-type Symbol = str
-type FieldClassSymbol = str
-type Rank = int | VarName
-type ConcreteField = AtomicField | FieldClassSymbol
-type FieldClass = frozenset[ConcreteField]
-
-type ConstraintRef = VarName | Rank | ConcreteField
+Symbol: t.TypeAlias = str
+FieldClassSymbol: t.TypeAlias = str
+Rank: t.TypeAlias = int | VarName
+ConcreteField: t.TypeAlias = AtomicField | FieldClassSymbol
+FieldClass: t.TypeAlias = frozenset[ConcreteField]
+ConstraintRef: t.TypeAlias = VarName | Rank | ConcreteField
 
 
 @dataclass(slots=True, frozen=True)
@@ -76,19 +75,21 @@ class TensorAnnotation:
     ranks: tuple[Rank, ...]
 
     def __str__(self):
-        return (
-            f"{"".join(f"[{rank}]" for rank in self.ranks)}{str(self.field)}"
-        )
+        ranks_str = "".join(f"[{rank}]" for rank in self.ranks)
+        return f"{ranks_str}{str(self.field)}"
+
+
+_T = t.TypeVar("_T", VarName, Symbol)
 
 
 @dataclass(slots=True, frozen=True)
-class SumType[T: VarName | Symbol]:
-    symbol: T
+class SumType(t.Generic[_T]):
+    symbol: _T
     group: FieldClass
 
 
-type LocalSumType = SumType[VarName]
-type GlobalSumType = SumType[Symbol]
+LocalSumType: t.TypeAlias = SumType[VarName]
+GlobalSumType: t.TypeAlias = SumType[Symbol]
 
 
 @dataclass(slots=True, frozen=True)
@@ -131,8 +132,8 @@ class Fn:
     body: FnBody | None
 
 
-type ParsedNamespace = dict[Symbol, Fn | GlobalSumType]
-type LocalNamespace = dict[VarName, NodeT]
+ParsedNamespace: t.TypeAlias = dict[Symbol, Fn | GlobalSumType]
+LocalNamespace: t.TypeAlias = dict[VarName, NodeT]
 
 
 @dataclass(slots=True, frozen=True)
@@ -154,10 +155,10 @@ class FnDefAst:
     acns: dict[VarName, TensorAnnotation]
 
 
-type FnDefNamespace = dict[Symbol, FnDefAst]
-type FnDeclNamespace = dict[Symbol, FnDeclAst]
-type SumTypeNamespace = dict[Symbol, GlobalSumType]
-type SymbolNamespace = dict[Symbol, ModScopeT]
+FnDefNamespace: t.TypeAlias = dict[Symbol, FnDefAst]
+FnDeclNamespace: t.TypeAlias = dict[Symbol, FnDeclAst]
+SumTypeNamespace: t.TypeAlias = dict[Symbol, GlobalSumType]
+SymbolNamespace: t.TypeAlias = dict[Symbol, ModScopeT]
 
 
 @dataclass(slots=True, frozen=True)
