@@ -1,7 +1,7 @@
 { pkgs, versions }:
 let
   python = pkgs.${versions.python};
-  backend_deps = import ./targets/backend/deps { inherit pkgs versions; };
+  backend_deps = import ./compiler/deps { inherit pkgs versions; };
   base_pkgs = [
     pkgs.just
     pkgs.pre-commit
