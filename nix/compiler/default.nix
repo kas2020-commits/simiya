@@ -4,7 +4,7 @@ let
   deps = import ./deps { inherit pkgs versions; };
 in
 pyPackages.buildPythonPackage {
-  pname = "tur";
+  pname = "simiya";
   nativeBuildInputs = deps.native;
   propagatedBuildInputs = deps.propagate;
   version = versions.backend;

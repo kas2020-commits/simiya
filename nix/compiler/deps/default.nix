@@ -17,5 +17,5 @@ in
 {
   inherit pylibs other_pkgs;
   native = [ pyPackages.flit-core ];
-  propagate = pylibs + other_pkgs;
+  propagate = pylibs ++ other_pkgs;
 }
