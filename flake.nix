@@ -2,20 +2,39 @@
   description = "Simiya";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
+
+    # nixpkgs = {
+    #   url = "github:nixos/nixpkgs/nixos-23.11";
+    # };
+
+    nixpkgs-unstable = {
+      url = "github:nixos/nixpkgs/nixos-unstable";
+    };
+
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
+      inputs.nixpkgs-lib.follows = "nixpkgs-unstable";
+    };
+
   };
 
-  outputs = { nixpkgs, flake-utils, ... }:
+  outputs = inputs@{ self, nixpkgs, flake-parts, ... }:
     let
       repo = import ./nix;
-      versions = repo.versions;
     in
-    flake-utils.lib.eachSystem versions.supportedSystems
-      (system:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
+      ];
+
+      imports = [ ];
+
+      perSystem = { pkgs, system, ... }:
         let
-          pkgs = import nixpkgs { inherit system; };
-          shells = repo.devShell { inherit pkgs versions; };
+          shells = repo.devShell { inherit (repo) versions; inherit pkgs; };
         in
         {
           formatter = pkgs.nixpkgs-fmt;
@@ -26,10 +45,12 @@
           };
           packages = {
             default = repo.compiler {
-              inherit pkgs versions;
+              inherit pkgs; inherit (repo) versions;
               src = ./.;
             };
           };
-        }
-      );
+        };
+
+    };
+
 }
