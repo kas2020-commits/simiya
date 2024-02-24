@@ -1,9 +1,9 @@
 import rich
 import typer
 
-from . import grammar
-from .ast import parse_module
-from .type_check import check_module
+from .frontend import grammar
+from .frontend.ast import parse_module
+from .type_system.functions import check_module
 
 App = typer.Typer(help="Typer")
 

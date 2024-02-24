@@ -1,9 +1,8 @@
 import typing as t
 
-import networkx as nx
 from rich import print
 
-from . import types as tt
+from simiya import datatypes as tt
 
 
 def get_new_varname(
@@ -20,14 +19,13 @@ def get_new_varname(
     raise ValueError("Ran out of local variable names!")
 
 
-def fn_decl_to_ast(namespace: tt.ParsedNamespace, fn: tt.Fn) -> tt.FnDeclAst:
+def decl_to_ast(namespace: tt.ParsedNamespace, fn: tt.Fn) -> tt.FnDeclAst:
     return tt.FnDeclAst(
         symbol=fn.symbol, constraints=fn.constraints, args=fn.args, ret=fn.ret
     )
 
 
-def fn_def_to_ast(namespace: tt.ParsedNamespace, fn: tt.Fn) -> tt.FnDefAst:
-    compute_dag: nx.DiGraph[tt.VarName] = nx.DiGraph()
+def def_to_ast(namespace: tt.ParsedNamespace, fn: tt.Fn) -> tt.FnDefAst:
     fn_namespace: tt.LocalNamespace = {}
 
     if fn.body is None:
@@ -36,7 +34,6 @@ def fn_def_to_ast(namespace: tt.ParsedNamespace, fn: tt.Fn) -> tt.FnDefAst:
     for compute_node in (*fn.args, *fn.body.inodes):
         if compute_node.name in fn_namespace:
             raise ValueError("Same variable defined multiple times")
-        compute_dag.add_node(compute_node.name)
 
     for compute_node in fn.args:
         fn_namespace[compute_node.name] = tt.NodeT.ACN
@@ -45,16 +42,10 @@ def fn_def_to_ast(namespace: tt.ParsedNamespace, fn: tt.Fn) -> tt.FnDefAst:
         fn_namespace[compute_node.name] = tt.NodeT.ICN
 
     for inode in fn.body.inodes:
-        if inode.value is None:
-            raise ValueError("Internal Node is missing its definition")
-
         if inode.value.fn_symbol not in namespace:
             raise ValueError(
                 f"unknown symbol ({inode.value.fn_symbol} not in namespace)"
             )
-
-        for dependent_node in inode.value.nodes:
-            compute_dag.add_edge(dependent_node, inode.name)
 
     terminal_varname = get_new_varname(fn_namespace)
 
@@ -64,13 +55,9 @@ def fn_def_to_ast(namespace: tt.ParsedNamespace, fn: tt.Fn) -> tt.FnDefAst:
         name=terminal_varname, value=fn.body.terminal, annotation=fn.ret
     )
 
-    for dependent_node in fn.body.terminal.nodes:
-        compute_dag.add_edge(dependent_node, terminal_varname)
-
     return tt.FnDefAst(
         symbol=fn.symbol,
         constraints=fn.constraints,
-        compute_dag=compute_dag,
         namespace=fn_namespace,
         icns={x.name: x.value for x in fn.body.inodes},
         tcn=terminal_node,
@@ -102,7 +89,89 @@ def fetch_icn_nodetype(
             )
 
 
-def resolve_hm_substitution(
+def hm_sub_def(
+    invoked_fn: tt.FnDefAst,
+    expr: tt.Expression,
+    currexpr_env: tuple[tt.ArgNode, ...],
+    current_fn: tt.FnDefAst,
+    constraints: dict[tt.ConstraintRef, tt.ConstraintRef],
+):
+    if len(invoked_fn.acns) != len(expr.nodes):
+        raise ValueError(
+            f"Incorrect number of arguments provided to {invoked_fn.symbol}: "
+            f"expected {len(invoked_fn.acns)}, got {len(expr.nodes)}"
+        )
+    for (invoked_arg_name, invoked_arg_type), currarg in zip(
+        invoked_fn.acns.items(), currexpr_env
+    ):
+        if len(invoked_arg_type.ranks) != len(currarg.annotation.ranks):
+            raise ValueError(
+                f"Mismatching ranks between "
+                f"{invoked_arg_type=} and {currarg=} "
+                f"in {current_fn.symbol}"
+            )
+        constraints[invoked_arg_name] = currarg.name
+        for invoked_arg_rank, currarg_rank in zip(
+            invoked_arg_type.ranks, currarg.annotation.ranks
+        ):
+            constraints[invoked_arg_rank] = currarg_rank
+        constraints[invoked_arg_type.field] = currarg.annotation.field
+    subbed_type = tt.TensorAnnotation(
+        t.cast(
+            tt.VarName | tt.ConcreteField,
+            constraints[invoked_fn.tcn.annotation.field],
+        ),
+        t.cast(
+            tuple[tt.Rank, ...],
+            tuple(
+                constraints[rank] for rank in invoked_fn.tcn.annotation.ranks
+            ),
+        ),
+    )
+    return subbed_type
+
+
+def hm_sub_decl(
+    invoked_fn: tt.FnDeclAst,
+    expr: tt.Expression,
+    currexpr_env: tuple[tt.ArgNode, ...],
+    current_fn: tt.FnDefAst,
+    constraints: dict[tt.ConstraintRef, tt.ConstraintRef],
+):
+    if len(invoked_fn.args) != len(expr.nodes):
+        raise ValueError(
+            f"Incorrect number of arguments provided to {invoked_fn.symbol}: "
+            f"expected {len(invoked_fn.args)}, got {len(expr.nodes)}"
+        )
+
+    for invoked_arg, currarg in zip(invoked_fn.args, currexpr_env):
+        if len(invoked_arg.annotation.ranks) != len(currarg.annotation.ranks):
+            raise ValueError(
+                f"Mismatching ranks between "
+                f"{invoked_arg=} and {currarg=} "
+                f"in {current_fn.symbol}"
+            )
+        constraints[invoked_arg.name] = currarg.name
+        for invoked_arg_rank, currarg_rank in zip(
+            invoked_arg.annotation.ranks, currarg.annotation.ranks
+        ):
+            constraints[invoked_arg_rank] = currarg_rank
+        constraints[invoked_arg.annotation.field] = currarg.annotation.field
+
+    subbed_type = tt.TensorAnnotation(
+        t.cast(
+            tt.VarName | tt.ConcreteField,
+            constraints[invoked_fn.ret.field],
+        ),
+        t.cast(
+            tuple[tt.Rank, ...],
+            tuple(constraints[rank] for rank in invoked_fn.ret.ranks),
+        ),
+    )
+    return subbed_type
+
+
+def hm_substitution(
     mod: tt.Module,
     current_fn: tt.FnDefAst,
     expr: tt.Expression,
@@ -127,78 +196,13 @@ def resolve_hm_substitution(
     constraints: dict[tt.ConstraintRef, tt.ConstraintRef] = {}
     match invoked_fn:
         case tt.FnDefAst():
-            if len(invoked_fn.acns) != len(expr.nodes):
-                raise ValueError(
-                    f"Incorrect number of arguments provided to {invoked_fn.symbol}: "
-                    f"expected {len(invoked_fn.acns)}, got {len(expr.nodes)}"
-                )
-            for (invoked_arg_name, invoked_arg_type), currarg in zip(
-                invoked_fn.acns.items(), currexpr_env
-            ):
-                if len(invoked_arg_type.ranks) != len(
-                    currarg.annotation.ranks
-                ):
-                    raise ValueError(
-                        f"Mismatching ranks between "
-                        f"{invoked_arg_type=} and {currarg=} "
-                        f"in {current_fn.symbol}"
-                    )
-                constraints[invoked_arg_name] = currarg.name
-                for invoked_arg_rank, currarg_rank in zip(
-                    invoked_arg_type.ranks, currarg.annotation.ranks
-                ):
-                    constraints[invoked_arg_rank] = currarg_rank
-                constraints[invoked_arg_type.field] = currarg.annotation.field
-            subbed_type = tt.TensorAnnotation(
-                t.cast(
-                    tt.VarName | tt.ConcreteField,
-                    constraints[invoked_fn.tcn.annotation.field],
-                ),
-                t.cast(
-                    tuple[tt.Rank, ...],
-                    tuple(
-                        constraints[rank]
-                        for rank in invoked_fn.tcn.annotation.ranks
-                    ),
-                ),
+            return hm_sub_def(
+                invoked_fn, expr, currexpr_env, current_fn, constraints
             )
-            return subbed_type
         case tt.FnDeclAst():
-            if len(invoked_fn.args) != len(expr.nodes):
-                raise ValueError(
-                    f"Incorrect number of arguments provided to {invoked_fn.symbol}: "
-                    f"expected {len(invoked_fn.args)}, got {len(expr.nodes)}"
-                )
-
-            for invoked_arg, currarg in zip(invoked_fn.args, currexpr_env):
-                if len(invoked_arg.annotation.ranks) != len(
-                    currarg.annotation.ranks
-                ):
-                    raise ValueError(
-                        f"Mismatching ranks between "
-                        f"{invoked_arg=} and {currarg=} "
-                        f"in {current_fn.symbol}"
-                    )
-                constraints[invoked_arg.name] = currarg.name
-                for invoked_arg_rank, currarg_rank in zip(
-                    invoked_arg.annotation.ranks, currarg.annotation.ranks
-                ):
-                    constraints[invoked_arg_rank] = currarg_rank
-                constraints[
-                    invoked_arg.annotation.field
-                ] = currarg.annotation.field
-
-            subbed_type = tt.TensorAnnotation(
-                t.cast(
-                    tt.VarName | tt.ConcreteField,
-                    constraints[invoked_fn.ret.field],
-                ),
-                t.cast(
-                    tuple[tt.Rank, ...],
-                    tuple(constraints[rank] for rank in invoked_fn.ret.ranks),
-                ),
+            return hm_sub_decl(
+                invoked_fn, expr, currexpr_env, current_fn, constraints
             )
-            return subbed_type
 
 
 def check_fn(
@@ -206,7 +210,7 @@ def check_fn(
 ) -> dict[tt.VarName, tt.TensorAnnotation]:
     resolved_types: dict[tt.VarName, tt.TensorAnnotation] = {}
     for icn_name, expr in fn.icns.items():
-        icn_annotation = resolve_hm_substitution(
+        icn_annotation = hm_substitution(
             mod,
             fn,
             expr,
@@ -214,7 +218,7 @@ def check_fn(
             resolved_types,
         )
         resolved_types[icn_name] = icn_annotation
-    infered_ret_type = resolve_hm_substitution(
+    infered_ret_type = hm_substitution(
         mod, fn, fn.tcn.value, checked_defs, resolved_types
     )
     resolved_types[fn.tcn.name] = infered_ret_type

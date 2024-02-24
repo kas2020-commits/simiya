@@ -2,8 +2,6 @@ import enum
 import typing as t
 from dataclasses import dataclass
 
-import networkx as nx
-
 
 class VarName(enum.StrEnum):
     LETTER_A = "a"
@@ -148,7 +146,6 @@ class FnDeclAst:
 class FnDefAst:
     symbol: Symbol
     constraints: frozenset[LocalSumType]
-    compute_dag: nx.DiGraph
     namespace: LocalNamespace
     icns: dict[VarName, Expression]
     tcn: TerminalNode

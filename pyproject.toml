@@ -104,58 +104,12 @@ line_length = 79
 convention = "google"
 
 [tool.pyright]
-typeCheckingMode = "standard"
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "venv"
-]
+typeCheckingMode = "strict"
 strictListInference = true
 strictDictionaryInference = true
 strictSetInference = true
-analyzeUnannotatedFunctions = true
 strictParameterNoneValue = true
+analyzeUnannotatedFunctions = true
 deprecateTypingAliases = true
-
-[tool.mypy]
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "venv"
-]
+useLibraryCodeForTypes = true
+autoSearchPaths = true

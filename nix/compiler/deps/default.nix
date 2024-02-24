@@ -6,7 +6,7 @@ let
     rich
     typer
     colorama
-    networkx
+    # networkx
     numpy
     scipy
     matplotlib

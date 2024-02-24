@@ -6,8 +6,8 @@ import typing as t
 
 import lark
 
-from . import type_check as tc
-from . import types as tt
+from simiya import datatypes as tt
+from simiya import type_system as ts
 
 
 class TreeData(enum.StrEnum):
@@ -201,7 +201,8 @@ def match_toplvl_def(child: Child) -> tt.Fn | tt.GlobalSumType:
 
 def parse_module(tree: lark.ParseTree) -> tt.Module:
     values = [
-        match_toplvl_def(x) for x in t.cast(list[lark.Tree], tree.children)
+        match_toplvl_def(x)
+        for x in t.cast(list[lark.Tree[lark.Token]], tree.children)
     ]
     modv1 = {_k.symbol: _k for _k in values}
     fn_defs: tt.FnDefNamespace = {}
@@ -230,13 +231,11 @@ def parse_module(tree: lark.ParseTree) -> tt.Module:
                         raise ValueError(
                             "Cannot declare new functions after a definition"
                         )
-                    fn_decls[symbol] = tc.fn_decl_to_ast(modv1, toplvl)
+                    fn_decls[symbol] = ts.fn.decl_to_ast(modv1, toplvl)
                     symbols[symbol] = tt.ModScopeT.FN_DECL
                 else:
                     decls_ended = True
-                    fn_defs[symbol] = tc.fn_def_to_ast(modv1, toplvl)
+                    fn_defs[symbol] = ts.fn.def_to_ast(modv1, toplvl)
                     symbols[symbol] = tt.ModScopeT.FN_DEF
-            case _:
-                raise ValueError("wrong top-level")
 
     return tt.Module(symbols, sum_types, fn_decls, fn_defs)
