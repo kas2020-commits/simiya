@@ -1,6 +1,3 @@
-from . import functions
+from . import function, module
 
-# Abbreviations
-fn = functions
-
-__all__ = ["functions", "fn"]
+__all__ = ["function", "module"]

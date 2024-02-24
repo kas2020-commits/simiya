@@ -1,17 +1,14 @@
 import rich
 import typer
 
-from .frontend import grammar
-from .frontend.ast import parse_module
-from .type_system.functions import check_module
+from .frontend import lower_prog
+from .type_system.module import check_module
 
 App = typer.Typer(help="Typer")
 
 
 @App.command()
 def test():
-    parser = grammar.gen_parser()
-
     prog = r"""
 field Float := f8|f16|f32|f64;
 field Int := i8|i16|i32|i64;
@@ -44,9 +41,7 @@ fn <t Float> matmul3_alt (w: [h][j]t, x: [j][m]t, y: [m][n]t, z: [n][k]t) -> [h]
 }
     """
 
-    tree = parser.parse(prog)
-
-    mod = parse_module(tree)
+    mod = lower_prog(prog)
 
     check_module(mod)
 

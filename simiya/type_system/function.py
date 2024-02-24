@@ -1,7 +1,5 @@
 import typing as t
 
-from rich import print
-
 from simiya import datatypes as tt
 
 
@@ -227,11 +225,3 @@ def check_fn(
             f"Type Error: Expected {fn.tcn.annotation}, got {infered_ret_type}"
         )
     return resolved_types
-
-
-def check_module(mod: tt.Module):
-    checked_defs: set[tt.Symbol] = set()
-    for fn_symbol, fn_def_ast in mod.fn_defs.items():
-        resolved_fn_types = check_fn(mod, fn_def_ast, checked_defs)
-        print(resolved_fn_types)
-        checked_defs.add(fn_symbol)

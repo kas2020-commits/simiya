@@ -199,7 +199,7 @@ def match_toplvl_def(child: Child) -> tt.Fn | tt.GlobalSumType:
             raise ValueError("unknown top-level tree object.")
 
 
-def parse_module(tree: lark.ParseTree) -> tt.Module:
+def ast_convert(tree: lark.ParseTree) -> tt.Module:
     values = [
         match_toplvl_def(x)
         for x in t.cast(list[lark.Tree[lark.Token]], tree.children)
@@ -231,11 +231,11 @@ def parse_module(tree: lark.ParseTree) -> tt.Module:
                         raise ValueError(
                             "Cannot declare new functions after a definition"
                         )
-                    fn_decls[symbol] = ts.fn.decl_to_ast(modv1, toplvl)
+                    fn_decls[symbol] = ts.function.decl_to_ast(modv1, toplvl)
                     symbols[symbol] = tt.ModScopeT.FN_DECL
                 else:
                     decls_ended = True
-                    fn_defs[symbol] = ts.fn.def_to_ast(modv1, toplvl)
+                    fn_defs[symbol] = ts.function.def_to_ast(modv1, toplvl)
                     symbols[symbol] = tt.ModScopeT.FN_DEF
 
     return tt.Module(symbols, sum_types, fn_decls, fn_defs)
