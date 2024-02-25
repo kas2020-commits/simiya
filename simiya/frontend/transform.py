@@ -9,6 +9,8 @@ import lark
 
 from simiya import datatypes as tt
 
+from .datatypes import FnBody
+
 
 class TreeData(enum.StrEnum):
     start = enum.auto()
@@ -157,7 +159,7 @@ def parse_inodes(child: Child) -> tuple[tt.NamedExpression, ...]:
     return tuple(parse_inode(i) for i in child.children)
 
 
-def parse_fn_body(child: Child) -> tt.FnBody | None:
+def parse_fn_body(child: Child) -> FnBody | None:
     assert not isinstance(child, lark.Token)
     assert child.data == TreeData.fn_body
     match len(child.children):
@@ -171,7 +173,7 @@ def parse_fn_body(child: Child) -> tt.FnBody | None:
             (inodes_, terminal_) = child.children
             inodes = parse_inodes(inodes_)
             terminal = parse_expression(terminal_)
-            return tt.FnBody(inodes, terminal)
+            return FnBody(inodes, terminal)
         case _:
             raise AssertionError("I'm not sure what I got.")
 
@@ -185,7 +187,7 @@ def get_new_varname(fn_namespace: abc.Container[tt.VarName]) -> tt.VarName:
     raise ValueError("Ran out of local variable names!")
 
 
-def parse_fn(child: Child) -> tt.FnDefAst | tt.FnDeclAst:
+def parse_fn(child: Child) -> tt.UntypedFnDef | tt.FnDecl:
     assert not isinstance(child, lark.Token)
     assert child.data == TreeData.fn
     (constraints_, binding_, args_, ret_, fn_body_) = child.children
@@ -195,7 +197,7 @@ def parse_fn(child: Child) -> tt.FnDefAst | tt.FnDeclAst:
     ret = parse_tensor_annotation(ret_)
     body = parse_fn_body(fn_body_)
     if body is None:
-        return tt.FnDeclAst(
+        return tt.FnDecl(
             symbol=binding,
             constraints=constraints,
             acns={x.name: x for x in args},
@@ -229,19 +231,19 @@ def parse_fn(child: Child) -> tt.FnDefAst | tt.FnDeclAst:
             name=terminal_varname, value=body.terminal, type_=ret
         )
 
-        return tt.FnDefAst(
+        return tt.UntypedFnDef(
             symbol=binding,
             constraints=constraints,
             namespace=fn_namespace,
             icns={x.name: x.value for x in body.inodes},
-            tcn=terminal_node,
+            ret=terminal_node,
             acns={x.name: x for x in args},
         )
 
 
 def match_toplvl_def(
     child: Child,
-) -> tt.FnDefAst | tt.FnDeclAst | tt.GlobalSumType:
+) -> tt.UntypedFnDef | tt.FnDecl | tt.GlobalSumType:
     assert not isinstance(child, lark.Token)
     match child.data:
         case TreeData.user_field:
@@ -252,7 +254,7 @@ def match_toplvl_def(
             raise ValueError("unknown top-level tree object.")
 
 
-def ast_convert(tree: lark.ParseTree) -> tt.Module:
+def ast_convert(tree: lark.ParseTree) -> tt.UntypedModule:
     values = [
         match_toplvl_def(x)
         for x in t.cast(list[lark.Tree[lark.Token]], tree.children)
@@ -271,11 +273,11 @@ def ast_convert(tree: lark.ParseTree) -> tt.Module:
             case tt.SumType():
                 sum_types[symbol] = toplvl
                 symbols[symbol] = tt.ModScopeT.SUM_TYPE
-            case tt.FnDeclAst():
-                fn_decls[symbol] = toplvl
-                symbols[symbol] = tt.ModScopeT.FN_DECL
-            case tt.FnDefAst():
+            case tt.UntypedFnDef():
                 fn_defs[symbol] = toplvl
                 symbols[symbol] = tt.ModScopeT.FN_DEF
+            case tt.FnDecl():
+                fn_decls[symbol] = toplvl
+                symbols[symbol] = tt.ModScopeT.FN_DECL
 
-    return tt.Module(symbols, sum_types, fn_decls, fn_defs)
+    return tt.UntypedModule(symbols, sum_types, fn_decls, fn_defs)

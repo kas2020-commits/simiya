@@ -104,9 +104,9 @@ class NamedExpression:
 
 
 @dataclass(slots=True, frozen=True)
-class TypedNamedExpression:
-    name: VarName
-    value: Expression
+class TypedNamedExpression(NamedExpression):
+    # name: VarName
+    # value: Expresson
     type_: TensorType
 
 
@@ -116,56 +116,40 @@ class NamedType:
     type_: TensorType
 
 
-@dataclass(slots=True, frozen=True)
-class FnBody:
-    inodes: tuple[NamedExpression, ...]
-    terminal: Expression
+LocalNamespace: t.TypeAlias = abc.Mapping[VarName, NodeT]
 
 
 @dataclass(slots=True, frozen=True)
 class Fn:
     symbol: Binding
     constraints: abc.Set[LocalSumType]
-    args: tuple[NamedType, ...]
-    ret: TensorType
-    body: FnBody | None
-
-
-ParsedNamespace: t.TypeAlias = dict[Binding, Fn | GlobalSumType]
-LocalNamespace: t.TypeAlias = dict[VarName, NodeT]
-
-
-@dataclass(slots=True, frozen=True)
-class FnDeclAst:
-    symbol: Binding
-    constraints: abc.Set[LocalSumType]
     acns: abc.Mapping[VarName, NamedType]
+
+
+@dataclass(slots=True, frozen=True)
+class FnDecl(Fn):
     ret: TensorType
 
 
 @dataclass(slots=True, frozen=True)
-class FnDefAst:
-    symbol: Binding
-    constraints: abc.Set[LocalSumType]
+class FnDef(Fn):
+    ret: TypedNamedExpression
     namespace: LocalNamespace
+
+
+@dataclass(slots=True, frozen=True)
+class UntypedFnDef(FnDef):
     icns: abc.Mapping[VarName, Expression]
-    tcn: TypedNamedExpression
-    acns: abc.Mapping[VarName, NamedType]
 
 
 @dataclass(slots=True, frozen=True)
-class TypedFnDef:
-    symbol: Binding
-    constraints: abc.Set[LocalSumType]
-    namespace: LocalNamespace
+class TypedFnDef(FnDef):
     icns: abc.Mapping[VarName, TypedNamedExpression]
-    tcn: TypedNamedExpression
-    acns: abc.Mapping[VarName, NamedType]
 
 
-FnDefNamespace: t.TypeAlias = abc.Mapping[Binding, FnDefAst]
+FnDefNamespace: t.TypeAlias = abc.Mapping[Binding, UntypedFnDef]
 TypedFnDefNamespace: t.TypeAlias = abc.Mapping[Binding, TypedFnDef]
-FnDeclNamespace: t.TypeAlias = abc.Mapping[Binding, FnDeclAst]
+FnDeclNamespace: t.TypeAlias = abc.Mapping[Binding, FnDecl]
 SumTypeNamespace: t.TypeAlias = abc.Mapping[Binding, GlobalSumType]
 SymbolNamespace: t.TypeAlias = abc.Mapping[Binding, ModScopeT]
 
@@ -175,12 +159,13 @@ class Module:
     symbols: SymbolNamespace
     sum_types: SumTypeNamespace
     fn_decls: FnDeclNamespace
+
+
+@dataclass(slots=True, frozen=True)
+class UntypedModule(Module):
     fn_defs: FnDefNamespace
 
 
 @dataclass(slots=True, frozen=True)
-class TypedModule:
-    symbols: SymbolNamespace
-    sum_types: SumTypeNamespace
-    fn_decls: FnDeclNamespace
+class TypedModule(Module):
     fn_defs: TypedFnDefNamespace

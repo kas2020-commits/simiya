@@ -5,18 +5,18 @@ from simiya import datatypes as tt
 
 
 def fetch_named_type(
-    current_fn: tt.FnDefAst,
     argname: tt.VarName,
-    resolved_types: abc.Mapping[tt.VarName, tt.TypedNamedExpression],
+    current_fn: tt.UntypedFnDef,
+    resolved_exprs: abc.Mapping[tt.VarName, tt.TypedNamedExpression],
 ) -> tt.NamedType:
     """Fetch a named type for type-checking purposes."""
     match current_fn.namespace[argname]:
         case tt.NodeT.ACN:
             return current_fn.acns[argname]
         case tt.NodeT.ICN:
-            if argname not in resolved_types:
+            if argname not in resolved_exprs:
                 raise ValueError(f"Variable {argname} Used before definition")
-            currarg_type = resolved_types[argname]
+            currarg_type = resolved_exprs[argname]
             return tt.NamedType(name=argname, type_=currarg_type.type_)
         case tt.NodeT.TCN:
             raise ValueError(
@@ -25,11 +25,11 @@ def fetch_named_type(
             )
 
 
-def hm_sub_def(
-    invoked_fn: tt.FnDefAst,
+def hm_def_type(
+    invoked_fn: tt.UntypedFnDef,
     expr: tt.Expression,
     currexpr_env: abc.Iterable[tt.NamedType],
-    current_fn: tt.FnDefAst,
+    current_fn: tt.UntypedFnDef,
 ) -> tt.TensorType:
     constraints: dict[tt.ConstraintRef, tt.ConstraintRef] = {}
 
@@ -60,19 +60,19 @@ def hm_sub_def(
     subbed_type = tt.TensorType(
         t.cast(
             tt.VarName | tt.ConcreteField,
-            constraints[invoked_fn.tcn.type_.field],
+            constraints[invoked_fn.ret.type_.field],
         ),
-        tuple(constraints[rank] for rank in invoked_fn.tcn.type_.ranks),
+        tuple(constraints[rank] for rank in invoked_fn.ret.type_.ranks),
     )
 
     return subbed_type
 
 
-def hm_sub_decl(
-    invoked_fn: tt.FnDeclAst,
+def hm_decl_type(
+    invoked_fn: tt.FnDecl,
     expr: tt.Expression,
     currexpr_env: abc.Iterable[tt.NamedType],
-    current_fn: tt.FnDefAst,
+    current_fn: tt.UntypedFnDef,
 ) -> tt.TensorType:
     constraints: dict[tt.ConstraintRef, tt.ConstraintRef] = {}
 
@@ -110,11 +110,11 @@ def hm_sub_decl(
 
 
 def hm_expr_type(
-    mod: tt.Module,
-    current_fn: tt.FnDefAst,
+    mod: tt.UntypedModule,
+    current_fn: tt.UntypedFnDef,
     expr: tt.Expression,
-    checked_defs: abc.Set[tt.Binding],
-    resolved_types: abc.Mapping[tt.VarName, tt.TypedNamedExpression],
+    checked_fn_defs: abc.Set[tt.Binding],
+    resolved_exprs: abc.Mapping[tt.VarName, tt.TypedNamedExpression],
 ) -> tt.TensorType:
     """Resolve the type annotation for a given expression.
 
@@ -122,7 +122,7 @@ def hm_expr_type(
     to perform type substitution iteratively until all required types have been
     resolved.
     """
-    is_checked_fn_def = expr.fn_symbol in checked_defs
+    is_checked_fn_def = expr.fn_symbol in checked_fn_defs
     is_fn_decl = expr.fn_symbol in mod.fn_decls
     if not (is_checked_fn_def or is_fn_decl):
         raise ValueError(
@@ -134,18 +134,20 @@ def hm_expr_type(
         else mod.fn_defs[expr.fn_symbol]
     )
     currexpr_env = tuple(
-        fetch_named_type(current_fn, argname, resolved_types)
+        fetch_named_type(argname, current_fn, resolved_exprs)
         for argname in expr.nodes
     )
     match invoked_fn:
-        case tt.FnDefAst():
-            return hm_sub_def(invoked_fn, expr, currexpr_env, current_fn)
-        case tt.FnDeclAst():
-            return hm_sub_decl(invoked_fn, expr, currexpr_env, current_fn)
+        case tt.UntypedFnDef():
+            return hm_def_type(invoked_fn, expr, currexpr_env, current_fn)
+        case tt.FnDecl():
+            return hm_decl_type(invoked_fn, expr, currexpr_env, current_fn)
 
 
 def resolve_fn_types(
-    mod: tt.Module, fn: tt.FnDefAst, checked_defs: abc.Set[tt.Binding]
+    mod: tt.UntypedModule,
+    fn: tt.UntypedFnDef,
+    checked_defs: abc.Set[tt.Binding],
 ) -> abc.Mapping[tt.VarName, tt.TypedNamedExpression]:
     """Iteratively resolve all expression types in a function.
 
@@ -169,11 +171,11 @@ def resolve_fn_types(
 
     # Perform substitution on TCN
     infered_ret_type = hm_expr_type(
-        mod, fn, fn.tcn.value, checked_defs, resolved_types
+        mod, fn, fn.ret.value, checked_defs, resolved_types
     )
-    if infered_ret_type != fn.tcn.type_:
+    if infered_ret_type != fn.ret.type_:
         raise ValueError(
-            f"Type Error: Expected {fn.tcn.type_}, got {infered_ret_type}"
+            f"Type Error: Expected {fn.ret.type_}, got {infered_ret_type}"
         )
 
     return resolved_types
