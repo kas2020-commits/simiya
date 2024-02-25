@@ -1,15 +1,14 @@
+import typing as t
+
 import rich
 import typer
 
 from .frontend import lower_prog
-from .type_system.module import check_module
+from .type_system.module import typecheck_module
 
 App = typer.Typer(help="Typer")
 
-
-@App.command()
-def test():
-    prog = r"""
+PROG: t.Final = r"""
 field Float := f8|f16|f32|f64;
 field Int := i8|i16|i32|i64;
 
@@ -41,8 +40,9 @@ fn <t Float> matmul3_alt (w: [h][j]t, x: [j][m]t, y: [m][n]t, z: [n][k]t) -> [h]
 }
     """
 
-    mod = lower_prog(prog)
 
-    check_module(mod)
-
-    rich.print(mod)
+@App.command()
+def test():
+    mod = lower_prog(PROG)
+    typechecked_mod = typecheck_module(mod)
+    rich.print(typechecked_mod)

@@ -1,5 +1,6 @@
 import enum
 import typing as t
+from collections import abc
 from dataclasses import dataclass
 
 
@@ -59,103 +60,114 @@ class ModScopeT(enum.Enum):
     SUM_TYPE = enum.auto()
 
 
-Symbol: t.TypeAlias = str
+Binding: t.TypeAlias = str
 FieldClassSymbol: t.TypeAlias = str
 Rank: t.TypeAlias = int | VarName
 ConcreteField: t.TypeAlias = AtomicField | FieldClassSymbol
-FieldClass: t.TypeAlias = frozenset[ConcreteField]
+FieldClass: t.TypeAlias = abc.Set[ConcreteField]
 ConstraintRef: t.TypeAlias = VarName | Rank | ConcreteField
 
 
 @dataclass(slots=True, frozen=True)
-class TensorAnnotation:
+class TensorType:
     field: VarName | ConcreteField
-    ranks: tuple[Rank, ...]
+    ranks: abc.Sequence[ConstraintRef]
 
     def __str__(self):
         ranks_str = "".join(f"[{rank}]" for rank in self.ranks)
         return f"{ranks_str}{str(self.field)}"
 
 
-_T = t.TypeVar("_T", VarName, Symbol)
+_Symbol = t.TypeVar("_Symbol", VarName, Binding)
 
 
 @dataclass(slots=True, frozen=True)
-class SumType(t.Generic[_T]):
-    symbol: _T
+class SumType(t.Generic[_Symbol]):
+    symbol: _Symbol
     group: FieldClass
 
 
 LocalSumType: t.TypeAlias = SumType[VarName]
-GlobalSumType: t.TypeAlias = SumType[Symbol]
+GlobalSumType: t.TypeAlias = SumType[Binding]
 
 
 @dataclass(slots=True, frozen=True)
 class Expression:
-    fn_symbol: Symbol
+    fn_symbol: Binding
     nodes: tuple[VarName, ...]
 
 
 @dataclass(slots=True, frozen=True)
-class InternalNode:
+class NamedExpression:
     name: VarName
     value: Expression
 
 
 @dataclass(slots=True, frozen=True)
-class TerminalNode:
+class TypedNamedExpression:
     name: VarName
     value: Expression
-    annotation: TensorAnnotation
+    type_: TensorType
 
 
 @dataclass(slots=True, frozen=True)
-class ArgNode:
+class NamedType:
     name: VarName
-    annotation: TensorAnnotation
+    type_: TensorType
 
 
 @dataclass(slots=True, frozen=True)
 class FnBody:
-    inodes: tuple[InternalNode, ...]
+    inodes: tuple[NamedExpression, ...]
     terminal: Expression
 
 
 @dataclass(slots=True, frozen=True)
 class Fn:
-    symbol: Symbol
-    constraints: frozenset[LocalSumType]
-    args: tuple[ArgNode, ...]
-    ret: TensorAnnotation
+    symbol: Binding
+    constraints: abc.Set[LocalSumType]
+    args: tuple[NamedType, ...]
+    ret: TensorType
     body: FnBody | None
 
 
-ParsedNamespace: t.TypeAlias = dict[Symbol, Fn | GlobalSumType]
+ParsedNamespace: t.TypeAlias = dict[Binding, Fn | GlobalSumType]
 LocalNamespace: t.TypeAlias = dict[VarName, NodeT]
 
 
 @dataclass(slots=True, frozen=True)
 class FnDeclAst:
-    symbol: Symbol
-    constraints: frozenset[LocalSumType]
-    args: tuple[ArgNode, ...]
-    ret: TensorAnnotation
+    symbol: Binding
+    constraints: abc.Set[LocalSumType]
+    acns: abc.Mapping[VarName, NamedType]
+    ret: TensorType
 
 
 @dataclass(slots=True, frozen=True)
 class FnDefAst:
-    symbol: Symbol
-    constraints: frozenset[LocalSumType]
+    symbol: Binding
+    constraints: abc.Set[LocalSumType]
     namespace: LocalNamespace
-    icns: dict[VarName, Expression]
-    tcn: TerminalNode
-    acns: dict[VarName, TensorAnnotation]
+    icns: abc.Mapping[VarName, Expression]
+    tcn: TypedNamedExpression
+    acns: abc.Mapping[VarName, NamedType]
 
 
-FnDefNamespace: t.TypeAlias = dict[Symbol, FnDefAst]
-FnDeclNamespace: t.TypeAlias = dict[Symbol, FnDeclAst]
-SumTypeNamespace: t.TypeAlias = dict[Symbol, GlobalSumType]
-SymbolNamespace: t.TypeAlias = dict[Symbol, ModScopeT]
+@dataclass(slots=True, frozen=True)
+class TypedFnDef:
+    symbol: Binding
+    constraints: abc.Set[LocalSumType]
+    namespace: LocalNamespace
+    icns: abc.Mapping[VarName, TypedNamedExpression]
+    tcn: TypedNamedExpression
+    acns: abc.Mapping[VarName, NamedType]
+
+
+FnDefNamespace: t.TypeAlias = abc.Mapping[Binding, FnDefAst]
+TypedFnDefNamespace: t.TypeAlias = abc.Mapping[Binding, TypedFnDef]
+FnDeclNamespace: t.TypeAlias = abc.Mapping[Binding, FnDeclAst]
+SumTypeNamespace: t.TypeAlias = abc.Mapping[Binding, GlobalSumType]
+SymbolNamespace: t.TypeAlias = abc.Mapping[Binding, ModScopeT]
 
 
 @dataclass(slots=True, frozen=True)
@@ -164,3 +176,11 @@ class Module:
     sum_types: SumTypeNamespace
     fn_decls: FnDeclNamespace
     fn_defs: FnDefNamespace
+
+
+@dataclass(slots=True, frozen=True)
+class TypedModule:
+    symbols: SymbolNamespace
+    sum_types: SumTypeNamespace
+    fn_decls: FnDeclNamespace
+    fn_defs: TypedFnDefNamespace

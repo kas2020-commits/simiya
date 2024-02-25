@@ -3,11 +3,11 @@
 
 import enum
 import typing as t
+from collections import abc
 
 import lark
 
 from simiya import datatypes as tt
-from simiya import type_system as ts
 
 
 class TreeData(enum.StrEnum):
@@ -74,21 +74,21 @@ def parse_VARNAME(child: Child) -> tt.VarName:
     return tt.VarName(child.value)
 
 
-def parse_tensor_annotation(child: Child) -> tt.TensorAnnotation:
+def parse_tensor_annotation(child: Child) -> tt.TensorType:
     assert not isinstance(child, lark.Token)
     assert child.data == TreeData.ret
     field = _parse_field(child.children[-1])
     ranks = tuple(_parse_rank(x) for x in child.children[:-1])
-    return tt.TensorAnnotation(field=field, ranks=ranks)
+    return tt.TensorType(field=field, ranks=ranks)
 
 
-def parse_argument(child: Child) -> tt.ArgNode:
+def parse_argument(child: Child) -> tt.NamedType:
     assert not isinstance(child, lark.Token)
     assert child.data == TreeData.arg
     assert len(child.children) == 2
     var = parse_VARNAME(child.children[0])
     ret = parse_tensor_annotation(child.children[1])
-    return tt.ArgNode(name=var, annotation=ret)
+    return tt.NamedType(name=var, type_=ret)
 
 
 def _parse_fieldclass(child: Child) -> tt.FieldClass:
@@ -125,7 +125,7 @@ def parse_local_constraints(child: Child) -> frozenset[tt.LocalSumType]:
     return frozenset(parse_local_constraint(x) for x in child.children)
 
 
-def parse_arguments(child: Child) -> tuple[tt.ArgNode, ...]:
+def parse_arguments(child: Child) -> tuple[tt.NamedType, ...]:
     assert not isinstance(child, lark.Token)
     assert child.data == TreeData.args
     return tuple(parse_argument(x) for x in child.children)
@@ -141,17 +141,17 @@ def parse_expression(child: Child) -> tt.Expression:
     return tt.Expression(fn_name, nodes)
 
 
-def parse_inode(child: Child) -> tt.InternalNode:
+def parse_inode(child: Child) -> tt.NamedExpression:
     assert not isinstance(child, lark.Token)
     assert child.data == TreeData.inode
     assert len(child.children) == 2
     (varname_, expr_) = child.children
     varname = parse_VARNAME(varname_)
     expr = parse_expression(expr_)
-    return tt.InternalNode(varname, expr)
+    return tt.NamedExpression(varname, expr)
 
 
-def parse_inodes(child: Child) -> tuple[tt.InternalNode, ...]:
+def parse_inodes(child: Child) -> tuple[tt.NamedExpression, ...]:
     assert not isinstance(child, lark.Token)
     assert child.data == TreeData.inodes
     return tuple(parse_inode(i) for i in child.children)
@@ -176,7 +176,16 @@ def parse_fn_body(child: Child) -> tt.FnBody | None:
             raise AssertionError("I'm not sure what I got.")
 
 
-def parse_fn(child: Child) -> tt.Fn:
+def get_new_varname(fn_namespace: abc.Container[tt.VarName]) -> tt.VarName:
+    for candidate_varname in tt.VarName:
+        if candidate_varname in fn_namespace:
+            continue
+        else:
+            return candidate_varname
+    raise ValueError("Ran out of local variable names!")
+
+
+def parse_fn(child: Child) -> tt.FnDefAst | tt.FnDeclAst:
     assert not isinstance(child, lark.Token)
     assert child.data == TreeData.fn
     (constraints_, binding_, args_, ret_, fn_body_) = child.children
@@ -185,10 +194,54 @@ def parse_fn(child: Child) -> tt.Fn:
     args = parse_arguments(args_)
     ret = parse_tensor_annotation(ret_)
     body = parse_fn_body(fn_body_)
-    return tt.Fn(binding, constraints, args, ret, body)
+    if body is None:
+        return tt.FnDeclAst(
+            symbol=binding,
+            constraints=constraints,
+            acns={x.name: x for x in args},
+            ret=ret,
+        )
+    else:
+        # return tt.Fn(binding, constraints, args, ret, body)
+        fn_namespace: tt.LocalNamespace = {}
+
+        for compute_node in (*args, *body.inodes):
+            if compute_node.name in fn_namespace:
+                raise ValueError("Same variable defined multiple times")
+
+        for compute_node in args:
+            fn_namespace[compute_node.name] = tt.NodeT.ACN
+
+        for compute_node in body.inodes:
+            fn_namespace[compute_node.name] = tt.NodeT.ICN
+
+        # for inode in body.inodes:
+        #     if inode.value.fn_symbol not in namespace:
+        #         raise ValueError(
+        #             f"unknown symbol ({inode.value.fn_symbol} not in namespace)"
+        #         )
+
+        terminal_varname = get_new_varname(fn_namespace)
+
+        fn_namespace[terminal_varname] = tt.NodeT.TCN
+
+        terminal_node = tt.TypedNamedExpression(
+            name=terminal_varname, value=body.terminal, type_=ret
+        )
+
+        return tt.FnDefAst(
+            symbol=binding,
+            constraints=constraints,
+            namespace=fn_namespace,
+            icns={x.name: x.value for x in body.inodes},
+            tcn=terminal_node,
+            acns={x.name: x for x in args},
+        )
 
 
-def match_toplvl_def(child: Child) -> tt.Fn | tt.GlobalSumType:
+def match_toplvl_def(
+    child: Child,
+) -> tt.FnDefAst | tt.FnDeclAst | tt.GlobalSumType:
     assert not isinstance(child, lark.Token)
     match child.data:
         case TreeData.user_field:
@@ -204,14 +257,11 @@ def ast_convert(tree: lark.ParseTree) -> tt.Module:
         match_toplvl_def(x)
         for x in t.cast(list[lark.Tree[lark.Token]], tree.children)
     ]
-    modv1 = {_k.symbol: _k for _k in values}
+
     fn_defs: tt.FnDefNamespace = {}
     fn_decls: tt.FnDeclNamespace = {}
     sum_types: tt.SumTypeNamespace = {}
     symbols: tt.SymbolNamespace = {}
-
-    decls_ended = False
-    sum_types_ended = False
 
     for toplvl in values:
         symbol = toplvl.symbol
@@ -219,23 +269,13 @@ def ast_convert(tree: lark.ParseTree) -> tt.Module:
             raise ValueError(f"Duplicate symbol: {symbol}.")
         match toplvl:
             case tt.SumType():
-                if sum_types_ended:
-                    raise ValueError("Cannot define a field after a function")
                 sum_types[symbol] = toplvl
                 symbols[symbol] = tt.ModScopeT.SUM_TYPE
-            case tt.Fn():
-                if not sum_types_ended:
-                    sum_types_ended = True
-                if toplvl.body is None:
-                    if decls_ended:
-                        raise ValueError(
-                            "Cannot declare new functions after a definition"
-                        )
-                    fn_decls[symbol] = ts.function.decl_to_ast(modv1, toplvl)
-                    symbols[symbol] = tt.ModScopeT.FN_DECL
-                else:
-                    decls_ended = True
-                    fn_defs[symbol] = ts.function.def_to_ast(modv1, toplvl)
-                    symbols[symbol] = tt.ModScopeT.FN_DEF
+            case tt.FnDeclAst():
+                fn_decls[symbol] = toplvl
+                symbols[symbol] = tt.ModScopeT.FN_DECL
+            case tt.FnDefAst():
+                fn_defs[symbol] = toplvl
+                symbols[symbol] = tt.ModScopeT.FN_DEF
 
     return tt.Module(symbols, sum_types, fn_decls, fn_defs)
