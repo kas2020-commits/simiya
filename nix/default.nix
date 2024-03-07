@@ -1,5 +1,4 @@
 {
-  versions = import ./versions.nix;
-  devShell = import ./develop.nix;
+  devShells = import ./develop.nix;
   compiler = import ./compiler;
 }
