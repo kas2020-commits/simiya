@@ -10,8 +10,9 @@ in {
       ocaml
       findlib
       utop
-      dune_2
+      dune_3
       ocaml-lsp
+      ocamlformat
     ];
   };
 }
