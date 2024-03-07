@@ -1,0 +1,4 @@
+(executable
+ (public_name simiya)
+ (name main)
+ (libraries simiya))
